@@ -1,0 +1,933 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Ensayo del prototipo de papel de Nook: hipótesis, tarjetas dibujadas a mano, pruebas simuladas, incremento y evidencia.">
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Simulacro Nook en papel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Kalam:wght@300;400;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+/* Layout: una columna de lectura (760px) sobre un "escritorio" neutro; las tarjetas de papel se abren en galerías más anchas (1080px). */
+:root{
+  --bg:#f1f2ef; --surface:#ffffff; --fg:#1c1f25; --muted:#596070; --rule:#d7dade;
+  --accent:#1f5fbf; --pen-red:#c0322a; --pen-orange:#a85c0c;
+  --ok:#23763a; --warn:#9a6300; --bad:#c0322a; --shadow:rgba(20,24,30,.22);
+  /* mundo del papel: igual en ambos temas, como una tarjeta física sobre la mesa */
+  --paper:#f8f5e6; --grid:#d6dfe8; --ink:#23242b; --ink-blue:#2560c8; --ink-red:#d22f25; --pencil:#7f838c; --postit:#f6e07a;
+  --f-hand:"Kalam","Comic Sans MS",cursive;
+  --f-body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171c; --surface:#1b1f26; --fg:#e6e8ec; --muted:#9aa2b0; --rule:#2c313a;
+    --accent:#7ea9ff; --pen-red:#ff7c71; --pen-orange:#f0a557;
+    --ok:#6cc985; --warn:#f0b54a; --bad:#ff7c71; --shadow:rgba(0,0,0,.55);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14171c; --surface:#1b1f26; --fg:#e6e8ec; --muted:#9aa2b0; --rule:#2c313a;
+  --accent:#7ea9ff; --pen-red:#ff7c71; --pen-orange:#f0a557;
+  --ok:#6cc985; --warn:#f0b54a; --bad:#ff7c71; --shadow:rgba(0,0,0,.55);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16.5px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 80px}
+.prose{max-width:760px}
+p,li{max-width:72ch}
+a{color:var(--accent)}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--f-hand);font-weight:700;font-size:clamp(36px,6.5vw,58px);line-height:1.02;margin:.25em 0 .2em;text-wrap:balance}
+.lead{font-size:19px;color:var(--fg);margin:0 0 18px}
+h2{font-size:25px;line-height:1.2;margin:0 0 14px;text-wrap:balance;display:flex;gap:12px;align-items:baseline}
+h2 .n{font-family:var(--f-hand);font-weight:700;color:var(--accent);font-size:32px;min-width:1.3em;line-height:1}
+h3{font-size:18.5px;margin:30px 0 8px;text-wrap:balance}
+section{padding-block:40px 8px;border-top:1px solid var(--rule);margin-top:24px}
+.tag{font-family:var(--f-mono);font-size:.7em;font-weight:500;letter-spacing:.01em;padding:0 .3em;border:1px solid currentColor;border-radius:3px;white-space:nowrap;vertical-align:.1em}
+.sim{color:var(--pen-red)} .sup{color:var(--pen-orange)}
+.redpen{border:1.5px dashed var(--pen-red);padding:14px 18px;border-radius:2px;margin:18px 0}
+.redpen strong{font-family:var(--f-hand);font-size:20px;color:var(--pen-red);font-weight:700;display:block;margin-bottom:2px}
+.legend{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:15px;color:var(--muted);margin:10px 0 0}
+.toc ol{columns:2;column-gap:36px;padding-left:1.4em;margin:8px 0 0}
+.toc li{break-inside:avoid;padding:2px 0}
+@media (max-width:600px){.toc ol{columns:1}}
+.tbl{overflow-x:auto;margin:12px 0 6px}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--rule)}
+th{font-family:var(--f-mono);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;white-space:nowrap}
+td.c,th.c{text-align:center}
+.num{font-variant-numeric:tabular-nums;font-family:var(--f-mono);font-size:14px;white-space:nowrap}
+.stack{display:grid;gap:14px}
+.box{background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:16px 18px;min-width:0}
+.hid{font-family:var(--f-hand);font-weight:700;font-size:24px;color:var(--accent);line-height:1}
+.hyp p{margin:6px 0}
+.why{color:var(--muted);font-size:15px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:28px 22px;margin:14px 0 8px}
+.cards.wide{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+figure{margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.paper{background-color:var(--paper);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:13px 13px;border-radius:2px;box-shadow:0 1px 2px var(--shadow),0 8px 18px -10px var(--shadow);padding:5px;width:100%;max-width:270px;margin-inline:auto}
+.wide .paper{max-width:100%}
+.paper svg{display:block;width:100%;height:auto;max-width:100%}
+.paper svg path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.paper svg .s{stroke:var(--ink);stroke-width:1.15}
+.paper svg .sg{stroke:var(--pencil);stroke-width:.75}
+.paper svg .sb{stroke:var(--ink-blue);stroke-width:1.1}
+.paper svg .sr{stroke:var(--ink-red);stroke-width:1.25}
+.paper svg .hb{stroke:var(--ink-blue);stroke-width:.55;opacity:.55}
+.paper svg path.sf{fill:var(--paper);stroke:var(--ink);stroke-width:1.05}
+.paper svg text{font-family:var(--f-hand)}
+.paper svg .t{fill:var(--ink)} .paper svg .tg{fill:var(--pencil)} .paper svg .tr{fill:var(--ink-red)} .paper svg .tb{fill:var(--ink-blue)}
+.paper svg .fill{fill:var(--ink)} .paper svg .pi{fill:var(--postit)}
+figcaption{font-size:14.5px;line-height:1.45;color:var(--fg)}
+figcaption .cid{font-family:var(--f-mono);font-size:12.5px;font-weight:500;color:var(--accent);margin-right:6px}
+figcaption b{font-weight:600}
+figcaption p{margin:4px 0 0;color:var(--muted)}
+.ver{font-family:var(--f-mono);font-size:11px;border:1px solid var(--rule);border-radius:3px;padding:0 4px;margin-left:4px;color:var(--muted)}
+.ver.v1{color:var(--pen-red);border-color:var(--pen-red)}
+.people{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px;margin-top:12px}
+.person h4{margin:0;font-size:17.5px}
+.person .meta{color:var(--muted);font-size:14.5px;margin:2px 0 8px}
+.person ol{padding-left:1.25em;margin:6px 0 8px}
+.person li{font-size:15px;margin:2px 0}
+.person p{font-size:15px;margin:6px 0}
+blockquote{font-family:var(--f-hand);font-size:19px;line-height:1.3;margin:10px 0;padding-left:12px;border-left:2px solid var(--rule)}
+.results{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.r{font-family:var(--f-mono);font-size:12.5px;padding:1px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.ok{color:var(--ok)} .bad{color:var(--bad)} .mid{color:var(--warn)} .na{color:var(--muted)}
+.ficha{background:var(--surface);border:1px solid var(--fg);padding:18px 20px;border-radius:2px;font-size:15px}
+.ficha h4{font-family:var(--f-mono);font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:16px 0 6px;color:var(--muted);font-weight:500}
+.ficha h4:first-child{margin-top:0}
+.line{display:flex;flex-wrap:wrap;gap:6px 18px;margin:6px 0}
+.blank{display:inline-block;min-width:90px;border-bottom:1px solid var(--muted);height:1.1em;vertical-align:-.2em}
+.blank.l{min-width:220px} .blank.xl{display:block;width:100%;margin:12px 0 4px}
+.ficha table td{height:30px}
+.btn{font:inherit;font-size:14px;padding:6px 12px;border:1px solid var(--fg);background:transparent;color:var(--fg);border-radius:3px;cursor:pointer}
+.btn:hover{background:var(--surface)}
+.btn:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.toolbar{display:flex;gap:12px;align-items:center;margin:10px 0}
+.small{font-size:14px;color:var(--muted)}
+.script p{margin:8px 0}
+.script .t{font-family:var(--f-mono);font-size:12.5px;color:var(--accent);margin-right:6px;white-space:nowrap}
+ul.check{list-style:none;padding-left:0}
+ul.check li{padding-left:1.6em;position:relative;margin:4px 0}
+ul.check li::before{content:"";position:absolute;left:0;top:.3em;width:.85em;height:.85em;border:1.5px solid var(--muted);border-radius:2px}
+.cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+code{font-family:var(--f-mono);font-size:.9em}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header class="prose">
+  <div class="eyebrow">Taller de Diseño en Ingeniería 2026 · Clase C12 · Ensayo, no evaluado</div>
+  <h1>Nook en papel: simulacro de prototipo</h1>
+  <p class="lead">Ensayo completo del ejercicio de prototipado de baja fidelidad: hipótesis, tarjetas de papel, pruebas simuladas, un incremento y la evidencia que hay que llevar a clase.</p>
+  <div class="redpen">
+    <strong>Ojo antes de usar esto</strong>
+    El profesor pidió que el prototipo evaluado lo hagan ustedes, a mano y sin IA, y que lo prueben con personas reales. Las pantallas de esta página son una guía del ensayo: vuelvan a dibujarlas en cartulina con su propia mano y reemplacen todo lo marcado como inventado por lo que vean en sus pruebas.
+  </div>
+  <div class="legend">
+    <span><span class="tag sim">[SIMULADO]</span> inventado para el ensayo: personas, tiempos, citas, resultados</span>
+    <span><span class="tag sup">[SUPUESTO]</span> valor de ejemplo que el equipo debe decidir</span>
+  </div>
+  <nav class="toc" aria-label="Contenido">
+    <ol>
+      <li><a href="#s1">Hipótesis</a></li>
+      <li><a href="#s2">Prototipo de papel (versión 0)</a></li>
+      <li><a href="#s3">Plan de tiempo</a></li>
+      <li><a href="#s4">Guion de prueba</a></li>
+      <li><a href="#s5">Ficha de observación</a></li>
+      <li><a href="#s6">Ronda 1</a></li>
+      <li><a href="#s7">Tabla de aprendizajes</a></li>
+      <li><a href="#s8">Incremento #1</a></li>
+      <li><a href="#s9">Ronda 2</a></li>
+      <li><a href="#s10">Evidencia</a></li>
+      <li><a href="#s11">Guion de 2 minutos</a></li>
+      <li><a href="#s12">Siguiente clase: semi digital</a></li>
+      <li><a href="#s13">Datos a reemplazar</a></li>
+      <li><a href="#s14">Preguntas para el profesor</a></li>
+    </ol>
+  </nav>
+</header>
+
+<!-- 1 -->
+<section id="s1">
+  <div class="prose">
+  <h2><span class="n">1</span>Hipótesis</h2>
+  <p>Tres hipótesis sobre los puntos más riesgosos del flujo. Los números son <span class="tag sup">[SUPUESTO]</span>: el equipo los puede ajustar antes de probar, pero no después de ver los resultados.</p>
+  <div class="stack hyp">
+    <article class="box">
+      <div class="hid">H1 <span class="small">· conductor · paso 1: buscar y comparar</span></div>
+      <p>Creemos que un <b>conductor</b> puede <b>encontrar un estacionamiento cerca de su destino y entender cuánto pagará en total</b> sin ayuda. Lo sabremos si al menos el 80% <span class="tag sup">[SUPUESTO]</span> (4 de 5) elige un nook y dice bien el total para 2 horas en menos de 90 segundos <span class="tag sup">[SUPUESTO]</span>.</p>
+      <p class="why">Por qué: si el precio o la ubicación no se entienden, nadie reserva y el resto del flujo da lo mismo.</p>
+    </article>
+    <article class="box">
+      <div class="hid">H2 <span class="small">· conductor · paso 2: reservar y llegar</span></div>
+      <p>Creemos que un <b>conductor</b> puede <b>completar una reserva y saber qué mostrar al llegar a la portería</b> sin ayuda. Lo sabremos si al menos el 80% <span class="tag sup">[SUPUESTO]</span> termina la reserva en menos de 2 minutos <span class="tag sup">[SUPUESTO]</span> y, al preguntarle «¿qué haces al llegar?», menciona el código o la patente.</p>
+      <p class="why">Por qué: el FMEA marca el acceso restringido como riesgo; si el conductor llega sin saber qué mostrar, se traba la entrada.</p>
+    </article>
+    <article class="box">
+      <div class="hid">H3 <span class="small">· conserje · paso 3: autorizar la entrada</span></div>
+      <p>Creemos que un <b>conserje</b> puede <b>verificar una reserva y autorizar la entrada</b> sin ayuda y sin dejar pasar un auto equivocado. Lo sabremos si al menos el 80% <span class="tag sup">[SUPUESTO]</span> autoriza el auto correcto en 30 segundos o menos <span class="tag sup">[SUPUESTO]</span> y rechaza un auto que llega con otra patente.</p>
+      <p class="why">Por qué: el conserje tiene poco tiempo y es el filtro de seguridad (FMEA: ingreso inseguro); si Nook le suma trabajo o deja pasar a cualquiera, el edificio no lo acepta.</p>
+    </article>
+  </div>
+  <p class="small">Cómo medir: cronómetro del celular desde que la persona toca la primera tarjeta hasta que llega a la tarjeta final de la tarea. «Sin ayuda» significa que el facilitador no dio ninguna pista.</p>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="s2">
+  <div class="prose">
+  <h2><span class="n">2</span>Prototipo de papel (versión 0)</h2>
+
+  <h3>a) Materiales y herramientas, todo a $0</h3>
+  <ul>
+    <li>Cartulina blanca o cajas de cereal recicladas (para las tarjetas y el marco).</li>
+    <li>Hojas de cuaderno cuadriculado para borradores y la hoja de ruta.</li>
+    <li>Lápiz grafito y goma: el computador humano escribe «en vivo» lo que la persona teclea.</li>
+    <li>Plumón negro (dibujo), azul (botones principales) y rojo (solo para marcar los cambios del incremento).</li>
+    <li>Tijeras, regla, cinta adhesiva y un sobre o clip por cada set de tarjetas.</li>
+    <li>Post-its: teclado, menús, mensajes de «cargando» y de error.</li>
+    <li>Un celular para el cronómetro y otro para las fotos.</li>
+  </ul>
+
+  <h3>b) Formato</h3>
+  <ul>
+    <li><b>Tarjetas de 7 × 15 cm</b>, el tamaño real de un celular. Esto también prueba la <i>forma</i>: si algo no cabe o no se lee en ese tamaño, tampoco funcionará en el teléfono.</li>
+    <li><b>Marco de cartón</b> de 9 × 18 cm con una ventana de 6,5 × 14 cm. Detrás se pega otra capa de cartón solo por los lados y abajo, formando un bolsillo donde el computador humano desliza las tarjetas desde arriba.</li>
+    <li>Letras de al menos 4 mm de alto y botones de al menos 1 × 1 cm (el ancho de la yema del dedo).</li>
+    <li>Código en la esquina de atrás de cada tarjeta (C1, C2… para el conductor; K1, K2… para el conserje; P1, P2 para el propietario) para encontrarlas rápido.</li>
+  </ul>
+
+  <h3>c) Set de tarjetas</h3>
+  <p class="small">Cómo leer los dibujos: el gris es texto de ejemplo dentro de un campo, el rayado azul marca el botón principal y el rojo marca lo que cambió en el incremento. Direcciones, nombres y patentes son de ejemplo <span class="tag sup">[SUPUESTO]</span>.</p>
+  </div>
+
+  <h3>Conductor</h3>
+  <div class="cards">
+    <figure><div class="paper" data-s="C1" data-label="Tarjeta C1, inicio con mapa"></div><figcaption><span class="cid">C1</span><b>Inicio con mapa</b><span class="ver">v0</span><p>Arriba: ☰ menú, «nook», ícono de perfil. Centro: mapa dibujado de Viña (mar, estero, Av. Libertad, calles Norte, Plaza Vergara) con 3 pines y su precio en una burbuja. Abajo: barra «¿A dónde vas?» y botón «Buscar».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C2" data-label="Tarjeta C2, resultados"></div><figcaption><span class="cid">C2</span><b>Resultados</b><span class="ver">v0</span><p>Arriba: ← y «Cerca de Plaza Vergara»; filtros de hora y duración. Centro: 3 edificios con minutos a pie, precio por hora y nota. Abajo: «Ver mapa».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C3" data-label="Tarjeta C3, detalle del edificio"></div><figcaption><span class="cid">C3</span><b>Detalle del nook</b><span class="ver">v0</span><p>Arriba: ← y nombre; dibujo del edificio. Centro: dirección, horario, precio por hora, altura máxima y cómo se entra. Abajo: «Reservar».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C4" data-label="Tarjeta C4, reservar"></div><figcaption><span class="cid">C4</span><b>Reservar</b><span class="ver">v0</span><p>Centro: hora de llegada, duración (− 2 horas +), campo de patente y tolerancia de 15 min <span class="tag sup">[SUPUESTO]</span>. Abajo: total aproximado en letra chica y «Confirmar reserva».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C5" data-label="Tarjeta C5, reserva confirmada"></div><figcaption><span class="cid">C5</span><b>Reserva confirmada</b><span class="ver">v0</span><p>Arriba: ✓ grande y «¡Reservado!». Centro: edificio, hora límite, código NK-4821 en letra chica y un cuadro tipo QR. Abajo: «Cómo llegar» y «Ver mi reserva».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C6" data-label="Tarjeta C6, estacionado"></div><figcaption><span class="cid">C6</span><b>En el edificio</b><span class="ver">v0</span><p>Centro: hora de entrada, reloj con el tiempo que lleva, hora de término y recordatorio de salir a pie por portería. Abajo: «Terminar y pagar».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C7" data-label="Tarjeta C7, pagar"></div><figcaption><span class="cid">C7</span><b>Pagar al salir</b><span class="ver">v0</span><p>Centro: entrada y salida, detalle del cobro, minutos de gracia y total. Abajo: medio de pago, aviso de multa (paso 6) y «Pagar $2.400».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C8" data-label="Tarjeta C8, pagado"></div><figcaption><span class="cid">C8</span><b>Pagado</b><span class="ver">v0</span><p>Centro: ✓ «Pagado», aviso de que el conserje ya ve el pago y 5 estrellas para calificar. Abajo: «Volver al inicio».</p></figcaption></figure>
+    <figure><div class="paper" data-s="E1" data-label="Tarjeta E1, lugar ocupado"></div><figcaption><span class="cid">E1</span><b>Lugar ocupado</b><span class="ver">v0</span><p>Prueba el bloqueo por doble reserva del FMEA. Centro: aviso, «no te cobramos nada» y 2 alternativas cercanas. Abajo: «Ver más opciones».</p></figcaption></figure>
+  </div>
+
+  <h3>Conserje</h3>
+  <div class="cards">
+    <figure><div class="paper" data-s="K1" data-label="Tarjeta K1, portería"></div><figcaption><span class="cid">K1</span><b>Portería</b><span class="ver">v0</span><p>Arriba: nombre del edificio. Centro: botón grande «Ingresar código» y próximas reservas (sin patente). Abajo: «Autos dentro».</p></figcaption></figure>
+    <figure><div class="paper" data-s="K2" data-label="Tarjeta K2, datos de la reserva"></div><figcaption><span class="cid">K2</span><b>Datos de la reserva</b><span class="ver">v0</span><p>Arriba: código y «válido». Centro: 7 datos en letra chica (nombre, patente, teléfono, horario, N°, pago, auto). Abajo: «Autorizar entrada» y «Rechazar».</p></figcaption></figure>
+    <figure><div class="paper" data-s="K3" data-label="Tarjeta K3, entrada autorizada"></div><figcaption><span class="cid">K3</span><b>Entrada autorizada</b><span class="ver">v0</span><p>Centro: ✓, número de estacionamiento en grande y recordatorio de que el conductor salga a pie. Abajo: «Salió a pie».</p></figcaption></figure>
+    <figure><div class="paper" data-s="K4" data-label="Tarjeta K4, salida del auto"></div><figcaption><span class="cid">K4</span><b>Salida del auto</b><span class="ver">v0</span><p>Centro: patente, estado del pago y hora. Aviso: con pago pendiente no se abre. Abajo: «Confirmar salida».</p></figcaption></figure>
+  </div>
+
+  <h3>Propietario (opcional)</h3>
+  <div class="cards">
+    <figure><div class="paper" data-s="P1" data-label="Tarjeta P1, publicar estacionamiento"></div><figcaption><span class="cid">P1</span><b>Publicar mi estacionamiento</b><span class="ver">v0</span><p>Centro: número, días, horario, precio por hora y reglas. Abajo: «Publicar».</p></figcaption></figure>
+    <figure><div class="paper" data-s="P2" data-label="Tarjeta P2, ganancias"></div><figcaption><span class="cid">P2</span><b>Ganancias</b><span class="ver">v0</span><p>Centro: total del mes, barras por semana y reparto por reserva (75% / 15% / 10%) <span class="tag sup">[SUPUESTO]</span>. Abajo: «Ver detalle».</p></figcaption></figure>
+  </div>
+
+  <h3>Objetos de apoyo</h3>
+  <div class="cards wide">
+    <figure><div class="paper" data-s="mapa" data-label="Mapa de Viña en hoja A4"></div><figcaption><span class="cid">A1</span><b>Mapa de Viña en hoja A4 y autito de papel</b><p>Cuando la persona toca «Cómo llegar», el facilitador mueve el autito hasta el edificio y dice «llegaste». Los edificios A, B y C están donde aparecen en las tarjetas.</p></figcaption></figure>
+    <figure><div class="paper" data-s="ticket" data-label="Tarjeta de reserva impresa"></div><figcaption><span class="cid">A2</span><b>Tarjeta de reserva en papel</b><p>Respaldo del código para la estación del conserje: el actor que hace de conductor la muestra al llegar.</p></figcaption></figure>
+    <figure><div class="paper" data-s="patentes" data-label="Dos patentes de papel"></div><figcaption><span class="cid">A3</span><b>Patentes de papel</b><p>Una correcta y una distinta para el escenario 2 del conserje. El conserje no sabe que una no coincide.</p></figcaption></figure>
+    <figure><div class="paper" data-s="postits" data-label="Post-its de teclado, menú, cargando y rechazo"></div><figcaption><span class="cid">A4</span><b>Post-its</b><p>Teclado, menú ☰, «Cargando…» y «Entrada rechazada». Agreguen uno de «¡Publicado!» si prueban al propietario.</p></figcaption></figure>
+  </div>
+
+  <div class="prose">
+  <h3>d) Hoja de ruta del computador humano</h3>
+  <p class="small">Regla de oro: si la persona toca algo que no es un botón, la tarjeta no cambia y el observador lo anota.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Tarjeta actual</th><th>Acción de la persona</th><th>Tarjeta siguiente</th></tr></thead>
+    <tbody>
+      <tr><td>C1</td><td>Toca un pin o un precio del mapa</td><td>C3 de ese edificio</td></tr>
+      <tr><td>C1</td><td>Escribe el destino en la barra y toca «Buscar»</td><td>C2</td></tr>
+      <tr><td>C1</td><td>Toca ☰</td><td>Post-it «Menú» encima de C1; al tocar fuera, se retira</td></tr>
+      <tr><td>C2</td><td>Toca un edificio</td><td>C3</td></tr>
+      <tr><td>C2</td><td>Toca «Ver mapa»</td><td>C1</td></tr>
+      <tr><td>C3</td><td>Toca «Reservar»</td><td>C4</td></tr>
+      <tr><td>C3 / C4</td><td>Toca ←</td><td>Tarjeta anterior</td></tr>
+      <tr><td>C4</td><td>Toca el campo Patente</td><td>Post-it teclado; el computador humano escribe con lápiz lo que la persona dicta</td></tr>
+      <tr><td>C4</td><td>Toca «Confirmar reserva»</td><td>C5 (o E1, solo en la prueba planificada de doble reserva)</td></tr>
+      <tr><td>E1</td><td>Toca otro edificio o «Ver más opciones»</td><td>C3 de ese edificio, o C2</td></tr>
+      <tr><td>C5</td><td>Toca «Cómo llegar»</td><td>Mapa A4: el facilitador mueve el autito y dice «llegaste a la portería»</td></tr>
+      <tr><td>C5</td><td>Responde «¿qué haces al llegar?»</td><td>El facilitador dice «el conserje te deja pasar» y se pone C6</td></tr>
+      <tr><td>C6</td><td>Toca «Terminar y pagar»</td><td>C7</td></tr>
+      <tr><td>C7</td><td>Toca «Pagar $2.400»</td><td>Post-it «Cargando…» 2 segundos, luego C8</td></tr>
+      <tr><td>C8</td><td>Toca estrellas o «Volver al inicio»</td><td>C1 (fin de la tarea)</td></tr>
+      <tr><td>K1</td><td>Toca «Ingresar código»</td><td>Post-it teclado; escribe el código</td></tr>
+      <tr><td>Teclado (K)</td><td>Termina de escribir</td><td>K2</td></tr>
+      <tr><td>K2</td><td>Toca «Autorizar entrada»</td><td>K3</td></tr>
+      <tr><td>K2</td><td>Toca «Rechazar»</td><td>Post-it «Entrada rechazada», luego K1</td></tr>
+      <tr><td>K3</td><td>Toca «Salió a pie»</td><td>K1 con «Autos dentro: 1»</td></tr>
+      <tr><td>K1</td><td>Toca «Autos dentro» y elige el auto</td><td>K4</td></tr>
+      <tr><td>K4</td><td>Toca «Confirmar salida»</td><td>K1</td></tr>
+      <tr><td>P1</td><td>Toca «Publicar»</td><td>Post-it «¡Publicado!», luego P2</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>e) Roles de los 5 integrantes</h3>
+  <p>Se usan dos estaciones en paralelo, porque las tarjetas del conductor y del conserje son sets separados. Así caben 5 personas en 30 minutos y cada una pasa unos 10 minutos en total.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Integrante</th><th>Rol</th><th>Qué hace</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Facilitador (estación conductor)</td><td>Pide el consentimiento, lee la consigna, cronometra y no ayuda.</td></tr>
+      <tr><td>2</td><td>Computador humano del conductor</td><td>Cambia tarjetas según la hoja de ruta, pone post-its y escribe con lápiz. Solo habla para decir «cargando».</td></tr>
+      <tr><td>3</td><td>Observador 1</td><td>Llena la ficha de la estación conductor: pasos, dudas, errores, tiempos y citas textuales.</td></tr>
+      <tr><td>4</td><td>Computador humano del conserje y actor</td><td>Hace de conductor que llega (muestra la tarjeta A2 y la patente de papel) y cambia las tarjetas K. Hace también las preguntas de cierre.</td></tr>
+      <tr><td>5</td><td>Observador 2 y registro fotográfico</td><td>Llena la ficha de la estación conserje y toma fotos en ambas estaciones: manos y tarjetas, nunca caras sin permiso.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">Con una sola estación (formato estricto de 10 min por persona), el integrante 4 pasa a ser observador 2, el 5 queda solo en fotos y caben 3 personas en 30 minutos.</p>
+  </div>
+</section>
+
+<!-- 3 -->
+<section id="s3">
+  <div class="prose">
+  <h2><span class="n">3</span>Plan de tiempo</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Bloque</th><th>Minutos</th><th>Qué se hace</th></tr></thead>
+    <tbody>
+      <tr><td><b>1. Construir</b><br><span class="num">30 min</span></td><td class="num">0–5<br>5–22<br><br><br>22–27<br>27–30</td><td>Repartir tarjetas y releer las hipótesis.<br>Dibujar: 1 y 2 hacen C1–C8; 3 hace E1 y los post-its; 4 hace K1–K4; 5 arma el marco, el mapa A4, las patentes y copia las fichas.<br>Ensayo interno completo: uno del equipo hace de usuario.<br>Foto del prototipo v0 completo, en orden sobre la mesa.</td></tr>
+      <tr><td><b>2. Testear</b><br><span class="num">30 min</span></td><td class="num">0–30</td><td>Dos estaciones en paralelo (tabla de abajo). Cada persona: 1 min de bienvenida y consentimiento, 5 min de tarea de conductor, 3 min de tarea de conserje y 2 min de preguntas de cierre.</td></tr>
+      <tr><td><b>3. Iterar</b><br><span class="num">30 min</span></td><td class="num">0–8<br>8–12<br>12–26<br>26–30</td><td>Cada observador lee su ficha; se marca H1–H3 con ✓ o ✗ por persona.<br>Elegir máximo 5 cambios: los que más afectan una hipótesis.<br>Redibujar solo las tarjetas que cambian, con «v1» en la esquina. Las v0 se guardan.<br>Actualizar la hoja de ruta y sacar fotos antes/después.</td></tr>
+      <tr><td><b>4. Re-testear</b><br><span class="num">fuera de clase</span></td><td class="num">~60 min</td><td>Probar la v1 con 3 a 5 personas nuevas (ojalá un conserje real y una persona mayor), con el mismo guion y fichas. Foto de cada prueba. Armar la evidencia para la próxima clase.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Bloque 2 minuto a minuto</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Minuto</th><th>Estación conductor (1, 2, 3)</th><th>Estación conserje (4, 5)</th></tr></thead>
+    <tbody>
+      <tr><td class="num">0–6</td><td>P1</td><td>P4 (solo hace la tarea de conserje)</td></tr>
+      <tr><td class="num">6–12</td><td>P2</td><td>P1</td></tr>
+      <tr><td class="num">12–18</td><td>P3</td><td>P2</td></tr>
+      <tr><td class="num">18–24</td><td>P5</td><td>P3</td></tr>
+      <tr><td class="num">24–30</td><td>Ordenar fichas y fotos</td><td>P5</td></tr>
+    </tbody>
+  </table></div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section id="s4">
+  <div class="prose">
+  <h2><span class="n">4</span>Guion de prueba</h2>
+  <h3>Introducción (1 frase)</h3>
+  <blockquote>«Estamos probando una idea de app dibujada en papel: no te evaluamos a ti sino al dibujo, así que si algo no se entiende es culpa nuestra, y nos ayuda mucho que pienses en voz alta.»</blockquote>
+  <h3>Consentimiento para fotos</h3>
+  <blockquote>«¿Te podemos sacar fotos de tus manos y de las tarjetas mientras pruebas? No sacamos tu cara si no quieres, no anotamos tu nombre (serás P1, P2…), las fotos son solo para el ramo y puedes parar cuando quieras.»</blockquote>
+  <p class="small">El observador anota en la ficha: fotos de manos sí/no, cara sí/no.</p>
+
+  <h3>Consigna del conductor</h3>
+  <p><b>A.</b> «Imagina que es martes, 8:40 de la mañana. Vas en auto a una reunión a las 9:00 cerca de la Plaza Vergara y te vas a quedar unas 2 horas. Tienes esta app en el celular. Muéstrame cómo resolverías dónde dejar el auto.»</p>
+  <p><b>Cuando elija un lugar:</b> «¿Cuánto crees que vas a pagar en total?» (H1)</p>
+  <p><b>B.</b> «Llegaste al edificio y estás frente a la portería. ¿Qué haces?» (H2)</p>
+  <p><b>C.</b> «Ya terminó tu reunión. Quieres irte.»</p>
+
+  <h3>Consigna del conserje</h3>
+  <p>«Eres conserje de este edificio y este es el celular de la portería. Va a llegar gente en auto: atiéndela como lo harías en tu turno.»</p>
+  <ul>
+    <li><b>Escenario 1:</b> el actor llega con la patente correcta (PX·LK·45) y dice «Hola, tengo un estacionamiento reservado».</li>
+    <li><b>Escenario 2:</b> llega con otra patente (PX·LR·91), dice lo mismo y muestra el mismo código. El conserje no sabe que no coincide.</li>
+    <li>Con conserjes reales (P4 y P9) se simula una interrupción (suena el citófono), porque así es su turno. Sus tiempos no se comparan directo con los demás.</li>
+  </ul>
+
+  <h3>Reglas para el facilitador</h3>
+  <ul>
+    <li>No digas cómo se hace ni nombres botones («toca Reservar»). Usa solo las palabras de la consigna.</li>
+    <li>Si pregunta «¿y ahora qué?», responde «¿Qué harías si estuvieras solo?».</li>
+    <li>Si lleva 60 segundos <span class="tag sup">[SUPUESTO]</span> trabado, pregunta «¿Qué estás buscando?». Si a los 2 minutos sigue igual, da una pista y marca la tarea «con ayuda»: no cuenta como éxito.</li>
+    <li>No defiendas el diseño ni expliques por qué es así.</li>
+    <li>Aguanta los silencios. Si se queda callado, pide una sola vez «piensa en voz alta, porfa».</li>
+    <li>Al final agradece. Nunca digas «lo hiciste bien» o «lo hiciste mal».</li>
+  </ul>
+
+  <h3>Preguntas de cierre</h3>
+  <ol>
+    <li>¿Qué fue lo más confuso?</li>
+    <li>Si le tuvieras que explicar a un amigo qué hace esta app, ¿qué le dirías?</li>
+    <li>¿Qué te daría confianza, o desconfianza, para dejar tu auto en un edificio que no conoces?</li>
+    <li>¿Cuánto pagarías como máximo por 2 horas en el centro de Viña?</li>
+    <li>(Conserje) ¿Esto te suma o te quita trabajo en tu turno? ¿Qué te haría aceptarlo?</li>
+    <li>Del 1 al 5, ¿qué tan fácil fue? ¿Por qué ese número?</li>
+  </ol>
+  </div>
+</section>
+
+<!-- 5 -->
+<section id="s5">
+  <div class="prose">
+  <h2><span class="n">5</span>Ficha de observación</h2>
+  <p>Una ficha por persona y por estación. Cópienla a mano en el cuaderno o péguenla en un documento para imprimir.</p>
+  <div class="toolbar"><button class="btn" id="copyFicha" type="button">Copiar ficha como texto</button><span class="small" id="copyMsg" aria-live="polite"></span></div>
+  <div class="ficha" id="ficha">
+    <h4>Datos</h4>
+    <div class="line"><span>Ronda: ☐ 1 ☐ 2</span><span>Versión: ☐ v0 ☐ v1</span><span>Estación: ☐ conductor ☐ conserje</span></div>
+    <div class="line"><span>Fecha <span class="blank"></span></span><span>Lugar <span class="blank"></span></span><span>Persona P<span class="blank" style="min-width:40px"></span></span><span>Observador <span class="blank"></span></span></div>
+    <div class="line"><span>Fotos: manos ☐ sí ☐ no · cara ☐ sí ☐ no</span></div>
+    <h4>Perfil</h4>
+    <div class="line"><span>Edad aprox. <span class="blank" style="min-width:50px"></span></span><span>Maneja: ☐ a diario ☐ semanal ☐ poco</span><span>¿Conoce Viña? ☐ sí ☐ no</span><span>¿Usa apps de mapas? ☐ sí ☐ no</span></div>
+    <h4>Tarea</h4>
+    <div class="line"><span>Inicio <span class="blank" style="min-width:60px"></span></span><span>Fin <span class="blank" style="min-width:60px"></span></span><span>Duración <span class="blank" style="min-width:60px"></span></span></div>
+    <div class="tbl"><table>
+      <thead><tr><th>Tarjeta</th><th>Qué hizo</th><th>Dudas o errores</th><th>¿Ayuda?</th></tr></thead>
+      <tbody><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td><td></td></tr></tbody>
+    </table></div>
+    <div class="line"><span>«¿Cuánto vas a pagar?» <span class="blank l"></span></span><span>¿Correcto? ☐ sí ☐ no</span></div>
+    <div class="line"><span>«¿Qué haces al llegar?» <span class="blank l"></span></span><span>¿Menciona código o patente? ☐ sí ☐ no</span></div>
+    <div class="line"><span>Conserje · esc. 1: <span class="blank" style="min-width:50px"></span> s ☐ autorizó</span><span>esc. 2: ☐ rechazó ☐ dejó pasar</span><span>Interrupción ☐ sí ☐ no</span></div>
+    <h4>Hipótesis</h4>
+    <div class="line"><span>H1 ☐ ✓ ☐ ✗ ☐ con ayuda</span><span>H2 ☐ ✓ ☐ ✗ ☐ con ayuda</span><span>H3 ☐ ✓ ☐ ✗ ☐ con ayuda</span></div>
+    <h4>Citas textuales</h4>
+    <span class="blank xl"></span><span class="blank xl"></span>
+    <h4>Respuestas de cierre (1 a 6)</h4>
+    <span class="blank xl"></span><span class="blank xl"></span><span class="blank xl"></span>
+    <h4>Idea de cambio (máximo 2) y N° de fotos</h4>
+    <span class="blank xl"></span><span class="blank xl"></span>
+  </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section id="s6">
+  <div class="prose">
+  <h2><span class="n">6</span>Ronda 1 <span class="tag sim">[SIMULADO]</span></h2>
+  <p>Cinco personas ficticias probando la versión 0. Todo lo de esta sección es inventado: perfiles, pasos, tiempos, citas y resultados.</p>
+  </div>
+  <div class="people">
+    <article class="box person">
+      <h4>P1 · Matías, 22 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Estudiante, maneja todos los días a la U y siempre va apurado. Hizo conductor y conserje.</p>
+      <ol>
+        <li>C1: mira el mapa 3 segundos y toca el pin «$1.200» más cercano → C3.</li>
+        <li>C3: lee rápido y toca «Reservar» → C4. Escribe la patente, deja 2 horas y confirma → C5.</li>
+        <li>Pregunta de precio: «Mil doscientos, ¿no?». Dice el precio por hora como si fuera el total.</li>
+        <li>Llegada: duda, vuelve a mirar C5 y dice «le muestro el código».</li>
+        <li>C7: se sorprende con $2.400.</li>
+        <li>Conserje: autoriza el escenario 1 mirando solo el código. En el escenario 2 deja pasar el auto con otra patente.</li>
+      </ol>
+      <p><b>Dudas y errores:</b> no vio que el precio era por hora; autorizó sin mirar la patente.</p>
+      <p><b>Tiempo:</b> <span class="num">0:55</span> hasta reservar · conserje <span class="num">12 s</span> y <span class="num">9 s</span>.</p>
+      <blockquote>«Mil doscientos, ¿no?… Ah, era por hora.»</blockquote>
+      <div class="results"><span class="r bad">H1 ✗</span><span class="r ok">H2 ✓</span><span class="r bad">H3 ✗ dejó pasar</span></div>
+    </article>
+    <article class="box person">
+      <h4>P2 · Gloria, 64 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Jubilada, usa WhatsApp y poco más; maneja al centro para ir al médico. Hizo conductor y conserje.</p>
+      <ol>
+        <li>C1: busca arriba dónde escribir. Toca ☰ y sale el menú; lo cierra.</li>
+        <li>A los 60 s pregunta «¿dónde pongo la dirección?». A los 2 min recibe una pista: la barra está abajo.</li>
+        <li>C2 → C3: «¿Mil doscientos la hora? Entonces son 2.400». Lo dice bien, pero después de la pista.</li>
+        <li>C4: busca la patente en el llavero y pide ayuda con el teclado.</li>
+        <li>Llegada: «Le digo mi nombre al conserje». No menciona el código.</li>
+        <li>Conserje: lee todo con calma y detecta la patente distinta, pero se demora.</li>
+      </ol>
+      <p><b>Dudas y errores:</b> no encontró la búsqueda; letra chica; teclado; no supo qué mostrar al llegar.</p>
+      <p><b>Tiempo:</b> <span class="num">3:40</span> hasta reservar · conserje <span class="num">45 s</span> en el escenario 1.</p>
+      <blockquote>«La letra es muy chica y no sé dónde se escribe.»</blockquote>
+      <div class="results"><span class="r bad">H1 ✗ con ayuda</span><span class="r bad">H2 ✗</span><span class="r bad">H3 ✗ lenta</span></div>
+    </article>
+    <article class="box person">
+      <h4>P3 · Rodrigo, 41 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Ingeniero con auto nuevo; desconfía de dejarlo en un edificio ajeno. Hizo conductor y conserje.</p>
+      <ol>
+        <li>C1 → toca un pin → C3. Lee todo y pregunta «¿quién responde si me rayan el auto?». El facilitador no responde.</li>
+        <li>Busca esa información en C3; no la encuentra. Igual calcula bien: $2.400.</li>
+        <li>C4: se queda 20 segundos antes de tocar «Confirmar».</li>
+        <li>Llegada: «Muestro el código».</li>
+        <li>Conserje: revisa la patente en ambos escenarios y rechaza la distinta.</li>
+      </ol>
+      <p><b>Dudas y errores:</b> ninguno de uso; la duda es de confianza (daños y seguro).</p>
+      <p><b>Tiempo:</b> precio en <span class="num">70 s</span> · reserva en <span class="num">1:35</span> · conserje <span class="num">22 s</span>.</p>
+      <blockquote>«Lo reservo porque es prueba. En la vida real no dejo mi auto sin saber quién se hace cargo.»</blockquote>
+      <div class="results"><span class="r ok">H1 ✓</span><span class="r ok">H2 ✓</span><span class="r ok">H3 ✓</span></div>
+    </article>
+    <article class="box person">
+      <h4>P4 · Héctor, 24 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Estudiante vespertino; trabaja de conserje los fines de semana en un edificio de Reñaca. Solo tarea de conserje, con interrupción simulada.</p>
+      <ol>
+        <li>K1 → «Ingresar código» → teclado. Escribe el código mientras «contesta el citófono».</li>
+        <li>K2: lee nombre y teléfono. «¿Para qué quiero yo el teléfono?». Autoriza.</li>
+        <li>Escenario 2: compara la patente con el papel y rechaza.</li>
+      </ol>
+      <p><b>Dudas y errores:</b> escribir el código le quita tiempo; demasiados datos en K2; pregunta cómo le pagan a él.</p>
+      <p><b>Tiempo:</b> conserje <span class="num">50 s</span> (esc. 1) y <span class="num">35 s</span> (esc. 2).</p>
+      <blockquote>«En la portería no tengo tiempo de andar escribiendo códigos. Que me salga la patente en una lista y listo.»</blockquote>
+      <div class="results"><span class="r na">H1 —</span><span class="r na">H2 —</span><span class="r bad">H3 ✗ lento</span></div>
+    </article>
+    <article class="box person">
+      <h4>P5 · Valentina, 29 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Viene de Santiago por trabajo y no conoce Viña. Hizo conductor y conserje.</p>
+      <ol>
+        <li>C1: escribe «Plaza Vergara» en la barra → C2. Ahí ve «$1.200/h».</li>
+        <li>Elige el de «2 min a pie» → C3 → «2.400 por las dos horas».</li>
+        <li>C4 → C5. Llegada: «le muestro el código».</li>
+        <li>C6: duda 15 s en «Terminar y pagar»: «¿pago antes de sacar el auto o después?».</li>
+        <li>Conserje: rechaza la patente distinta.</li>
+      </ol>
+      <p><b>Dudas y errores:</b> notó que el mapa y la lista muestran el precio distinto; duda sobre el momento del pago.</p>
+      <p><b>Tiempo:</b> precio en <span class="num">60 s</span> · reserva en <span class="num">1:20</span> · conserje <span class="num">28 s</span>.</p>
+      <blockquote>«En la lista sale "por hora", pero en el mapa no. En el mapa pensé que era el total.»</blockquote>
+      <div class="results"><span class="r ok">H1 ✓</span><span class="r ok">H2 ✓</span><span class="r ok">H3 ✓</span></div>
+    </article>
+  </div>
+
+  <div class="prose">
+  <h3>Resumen de la ronda 1 <span class="tag sim">[SIMULADO]</span></h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Hipótesis</th><th class="c">P1</th><th class="c">P2</th><th class="c">P3</th><th class="c">P4</th><th class="c">P5</th><th>Resultado</th></tr></thead>
+    <tbody>
+      <tr><td>H1 precio</td><td class="c bad">✗</td><td class="c bad">✗</td><td class="c ok">✓</td><td class="c na">—</td><td class="c ok">✓</td><td><span class="num">2 de 4 (50%)</span> · <span class="bad">no se cumple</span></td></tr>
+      <tr><td>H2 reserva y llegada</td><td class="c ok">✓</td><td class="c bad">✗</td><td class="c ok">✓</td><td class="c na">—</td><td class="c ok">✓</td><td><span class="num">3 de 4 (75%)</span> · <span class="mid">se cumple a medias</span></td></tr>
+      <tr><td>H3 conserje</td><td class="c bad">✗</td><td class="c bad">✗</td><td class="c ok">✓</td><td class="c bad">✗</td><td class="c ok">✓</td><td><span class="num">2 de 5 (40%)</span> · <span class="bad">no se cumple</span></td></tr>
+    </tbody>
+  </table></div>
+  <p class="small">P4 solo hizo la tarea de conserje, por eso H1 y H2 se cuentan sobre 4 personas.</p>
+  <h3>Problemas de usabilidad importantes</h3>
+  <ol>
+    <li><b>Precio ambiguo en el mapa.</b> El pin dice «$1.200» sin «por hora» y sin total; 2 de 4 lo leyeron como el total (P1, y P5 al principio). Afecta H1.</li>
+    <li><b>El conserje autoriza solo con el código.</b> La patente está escondida entre 7 datos chicos; P1 dejó pasar un auto equivocado y escribir el código tomó demasiado tiempo (P4). Afecta H3 y el riesgo de ingreso inseguro del FMEA.</li>
+    <li><b>Búsqueda abajo y letra chica.</b> P2 no encontró dónde escribir el destino. Afecta H1 y H2 en personas mayores.</li>
+    <li><b>Código chico en C5.</b> P1 tuvo que volver a buscarlo y P2 no supo qué mostrar. Afecta H2.</li>
+  </ol>
+  <p class="small">Hallazgos menores: confianza ante daños (P3), cuándo se paga (P5), cómo gana el conserje (P4) y el teléfono del conductor visible para el conserje sin necesidad (P4).</p>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="s7">
+  <div class="prose">
+  <h2><span class="n">7</span>Tabla de aprendizajes <span class="tag sim">[SIMULADO]</span></h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Hipótesis</th><th>Resultado</th><th>Evidencia o cita</th><th>Qué cambiamos</th></tr></thead>
+    <tbody>
+      <tr><td>H1 precio</td><td><span class="num">2 de 4</span><br><span class="bad">no se cumple</span></td><td>P1: «Mil doscientos, ¿no?… Ah, era por hora». P5: «en el mapa pensé que era el total».</td><td>Pines con «/h»; hora y duración se eligen antes del mapa; total grande en C3.</td></tr>
+      <tr><td>H2 reserva y llegada</td><td><span class="num">3 de 4</span><br><span class="mid">a medias</span></td><td>P2 tardó 3:40 y no mencionó el código; P1 tuvo que buscarlo de nuevo.</td><td>C5 con código grande, patente e instrucción «muestra esto al conserje». Búsqueda arriba.</td></tr>
+      <tr><td>H3 conserje</td><td><span class="num">2 de 5</span><br><span class="bad">no se cumple</span></td><td>P1 dejó pasar otra patente. P4: «no tengo tiempo de andar escribiendo códigos».</td><td>K1 con lista de llegadas por patente (sin escribir); K2 obliga a confirmar si la patente coincide; se quita el teléfono.</td></tr>
+      <tr><td>Fuera de las hipótesis: confianza</td><td><span class="num">1 de 4</span> preguntó</td><td>P3: «no dejo mi auto sin saber quién se hace cargo».</td><td>Sección «Reglas y seguro» en C3 con texto de ejemplo <span class="tag sup">[SUPUESTO]</span>. Se vuelve hipótesis H4 para la próxima clase.</td></tr>
+      <tr><td>Fuera de las hipótesis: conserje</td><td><span class="num">1 de 5</span> preguntó</td><td>P4: «¿Y a mí quién me paga por esto?».</td><td>Nada todavía: se prueba en la clase semi digital (H7).</td></tr>
+    </tbody>
+  </table></div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section id="s8">
+  <div class="prose">
+  <h2><span class="n">8</span>Incremento #1</h2>
+  <ol>
+    <li><b>C1 → C1 v1.</b> La barra «¿A dónde vas?» sube y crece; debajo van dos botones: hora de llegada y duración. Los pines dicen «$1.200/h». Letra de al menos 5 mm.</li>
+    <li><b>C3 → C3 v1.</b> Caja grande «Total por 2 h: $2.400» y sección «Reglas y seguro». El botón dice «Reservar por $2.400».</li>
+    <li><b>C4.</b> Sin redibujar: el total chico de abajo se tacha en rojo y se escribe arriba, grande.</li>
+    <li><b>C5 → C5 v1.</b> «Al llegar, muestra esto al conserje:», código NK-4821 grande y patente debajo.</li>
+    <li><b>K1 → K1 v1.</b> Lista de llegadas de hoy con la patente grande y la hora. El conserje toca la fila; «Ingresar código» queda chico abajo, solo como respaldo.</li>
+    <li><b>K2 → K2 v1.</b> Solo la patente en grande y la pregunta «¿Es la patente del auto?», con «Sí, coincide» y «No coincide». Queda nombre con inicial, horario y N° de estacionamiento. Se quita el teléfono: mostrar solo lo necesario (Ley 19.628).</li>
+    <li><b>C6.</b> Sin redibujar: bajo el botón se agrega «Paga aquí y después sal con el auto».</li>
+  </ol>
+  </div>
+
+  <h3>Tarjetas nuevas (v1)</h3>
+  <div class="cards">
+    <figure><div class="paper" data-s="C1v1" data-label="Tarjeta C1 versión 1"></div><figcaption><span class="cid">C1</span><b>Inicio</b><span class="ver v1">v1</span><p>Búsqueda arriba, hora y duración antes del mapa, precio con «/h».</p></figcaption></figure>
+    <figure><div class="paper" data-s="C3v1" data-label="Tarjeta C3 versión 1"></div><figcaption><span class="cid">C3</span><b>Detalle</b><span class="ver v1">v1</span><p>Total para la duración elegida en grande, más reglas y seguro <span class="tag sup">[SUPUESTO]</span>.</p></figcaption></figure>
+    <figure><div class="paper" data-s="C5v1" data-label="Tarjeta C5 versión 1"></div><figcaption><span class="cid">C5</span><b>Reserva confirmada</b><span class="ver v1">v1</span><p>Instrucción clara, código grande y patente.</p></figcaption></figure>
+    <figure><div class="paper" data-s="K1v1" data-label="Tarjeta K1 versión 1"></div><figcaption><span class="cid">K1</span><b>Llegadas de hoy</b><span class="ver v1">v1</span><p>El conserje toca la patente; no escribe nada.</p></figcaption></figure>
+    <figure><div class="paper" data-s="K2v1" data-label="Tarjeta K2 versión 1"></div><figcaption><span class="cid">K2</span><b>¿Coincide la patente?</b><span class="ver v1">v1</span><p>Mirar la patente es obligatorio para autorizar.</p></figcaption></figure>
+  </div>
+
+  <div class="prose">
+  <h3>Qué cambia en la hoja de ruta</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>Tarjeta actual</th><th>Acción</th><th>Tarjeta siguiente</th></tr></thead>
+    <tbody>
+      <tr><td class="bad">Sale</td><td>C1</td><td>Escribe el destino en la barra de abajo y toca «Buscar»</td><td>C2</td></tr>
+      <tr><td class="ok">Entra</td><td>C1 v1</td><td>Escribe el destino arriba y elige hora y duración</td><td>C2 (cada fila muestra el total para esa duración)</td></tr>
+      <tr><td class="ok">Entra</td><td>C1 v1</td><td>Toca «Ver lista (3)»</td><td>C2</td></tr>
+      <tr><td class="bad">Sale</td><td>K1</td><td>Toca «Ingresar código» → teclado</td><td>K2</td></tr>
+      <tr><td class="ok">Entra</td><td>K1 v1</td><td>Toca la fila con la patente</td><td>K2 v1</td></tr>
+      <tr><td class="ok">Entra</td><td>K1 v1</td><td>Toca «Ingresar código» (auto que no está en la lista)</td><td>Post-it teclado → K2 v1</td></tr>
+      <tr><td class="ok">Entra</td><td>K2 v1</td><td>Toca «Sí, coincide»</td><td>K3</td></tr>
+      <tr><td class="ok">Entra</td><td>K2 v1</td><td>Toca «No coincide»</td><td>Post-it «Entrada rechazada · pide al conductor que revise su reserva» → K1 v1</td></tr>
+    </tbody>
+  </table></div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section id="s9">
+  <div class="prose">
+  <h2><span class="n">9</span>Ronda 2 <span class="tag sim">[SIMULADO]</span></h2>
+  <p>Re-test fuera de clase con la versión 1 y cuatro personas nuevas.</p>
+  </div>
+  <div class="people">
+    <article class="box person">
+      <h4>P6 · Benjamín, 19 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Estudiante de primer año, maneja hace 6 meses. Conductor y conserje.</p>
+      <p>Escribe el destino arriba, elige 9:00 y 2 h, toca el pin más cercano y en C3 dice «$2.400, ahí sale». En C5 lee la instrucción en voz alta. Como conserje toca la fila y rechaza la patente distinta sin dudar.</p>
+      <p><b>Tiempo:</b> precio <span class="num">35 s</span> · reserva <span class="num">0:55</span> · conserje <span class="num">14 s</span>.</p>
+      <blockquote>«Es como pedir un Uber, pero al revés.»</blockquote>
+      <div class="results"><span class="r ok">H1 ✓</span><span class="r ok">H2 ✓</span><span class="r ok">H3 ✓</span></div>
+    </article>
+    <article class="box person">
+      <h4>P7 · Ana, 70 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Dueña de casa, maneja al centro dos veces por semana. Conductor y conserje.</p>
+      <p>Encuentra la búsqueda al tiro («ah, aquí arriba») y lee el total sin problema. En C4 se demora 1:10 solo en escribir la patente con el teclado de post-it. Al llegar: «le muestro este número». Como conserje compara la patente con calma y acierta.</p>
+      <p><b>Tiempo:</b> precio <span class="num">80 s</span> · reserva <span class="num">2:30</span> · conserje <span class="num">26 s</span>.</p>
+      <blockquote>«¿Tengo que escribir la patente cada vez? Yo nunca me la acuerdo.»</blockquote>
+      <div class="results"><span class="r ok">H1 ✓</span><span class="r bad">H2 ✗ tiempo</span><span class="r ok">H3 ✓</span></div>
+    </article>
+    <article class="box person">
+      <h4>P8 · Carolina, 35 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Profesora en el centro; desconfía de los edificios ajenos. Conductor y conserje.</p>
+      <p>Lee «Reglas y seguro» antes de reservar. Reserva, pero pregunta de quién es el seguro y cuánto cubre. Al llegar menciona el código y la patente. Como conserje rechaza la patente distinta.</p>
+      <p><b>Tiempo:</b> precio <span class="num">45 s</span> · reserva <span class="num">1:15</span> · conserje <span class="num">18 s</span>.</p>
+      <blockquote>«Dice que hay seguro, pero ¿de quién? ¿Cuánto cubre?»</blockquote>
+      <div class="results"><span class="r ok">H1 ✓</span><span class="r ok">H2 ✓</span><span class="r ok">H3 ✓</span></div>
+    </article>
+    <article class="box person">
+      <h4>P9 · Pedro, 47 <span class="tag sim">[SIMULADO]</span></h4>
+      <p class="meta">Conserje de un edificio de oficinas en calle Valparaíso. Solo conserje, en su portería, con interrupción.</p>
+      <p>Toca la fila, mira la patente, autoriza. En el escenario 2 toca «No coincide». Después pregunta qué hace si el auto llega una hora tarde.</p>
+      <p><b>Tiempo:</b> conserje <span class="num">22 s</span>.</p>
+      <blockquote>«Así sí: miro la patente, toco y listo. ¿Y si llega una hora tarde? ¿Le guardo el puesto?»</blockquote>
+      <div class="results"><span class="r na">H1 —</span><span class="r na">H2 —</span><span class="r ok">H3 ✓</span></div>
+    </article>
+  </div>
+
+  <div class="prose">
+  <h3>Comparación con la ronda 1 <span class="tag sim">[SIMULADO]</span></h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Hipótesis</th><th>Ronda 1 (v0)</th><th>Ronda 2 (v1)</th><th>Lectura</th></tr></thead>
+    <tbody>
+      <tr><td>H1 precio</td><td class="num">2 de 4 · 50%</td><td class="num">3 de 3 · 100%</td><td><span class="ok">Mejoró.</span> Con el total grande nadie confundió precio por hora con total.</td></tr>
+      <tr><td>H2 reserva y llegada</td><td class="num">3 de 4 · 75%</td><td class="num">2 de 3 · 67%</td><td><span class="mid">Sigue fallando, por otra razón.</span> Todos mencionaron el código; ahora el problema es escribir la patente (P7).</td></tr>
+      <tr><td>H3 conserje</td><td class="num">2 de 5 · 40%</td><td class="num">4 de 4 · 100%</td><td><span class="ok">Mejoró.</span> Nadie dejó pasar la patente distinta y todos bajaron de 30 s.</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>Qué sigue fallando:</b> escribir la patente cada vez (guardarla en el perfil), la confianza en el seguro (falta información real), qué hace el conserje si el auto llega tarde (P9) y cómo gana el conserje (P4).</p>
+  <p class="small">Con 3 a 5 personas por ronda, una sola persona mueve mucho el porcentaje. Esto muestra tendencias para decidir qué cambiar, no una prueba estadística.</p>
+  </div>
+</section>
+
+<!-- 10 -->
+<section id="s10">
+  <div class="prose">
+  <h2><span class="n">10</span>Evidencia</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>Qué</th><th>Antes (v0)</th><th>Después (v1)</th></tr></thead>
+    <tbody>
+      <tr><td>Prototipo completo</td><td>Todas las tarjetas en orden sobre la mesa, con una regla al lado para mostrar el tamaño</td><td>Misma foto, misma luz, con las v1 en su lugar y las v0 al costado</td></tr>
+      <tr><td>Marco</td><td>Marco con C1 puesta y una mano sosteniéndolo</td><td>Igual, con C1 v1</td></tr>
+      <tr><td>Tarjetas que cambian</td><td>C1, C3, C4, C5, C6, K1 y K2, una por foto</td><td>Cada versión nueva con el mismo encuadre</td></tr>
+      <tr><td>Hoja de ruta</td><td>Hoja v0</td><td>Hoja v1 con los cambios en rojo</td></tr>
+      <tr><td>Pruebas</td><td>1–2 fotos por persona de la ronda 1, ambas estaciones (manos y tarjetas)</td><td>1–2 fotos por persona de la ronda 2, ojalá el conserje en su portería si acepta</td></tr>
+      <tr><td>Fichas</td><td>Foto de las fichas llenas de la ronda 1</td><td>Foto de las fichas de la ronda 2</td></tr>
+      <tr><td>Resultados</td><td>Tabla de aprendizajes (sección 7)</td><td>Tabla de comparación (sección 9)</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Llevar a clase</h3>
+  <ul class="check">
+    <li>Prototipo físico v0 y v1 en un sobre, con el marco.</li>
+    <li>Hoja de ruta v0 y v1.</li>
+    <li>Fichas de observación llenas de ambas rondas.</li>
+    <li>Hoja con las 3 hipótesis, sus criterios y el resultado de cada ronda.</li>
+    <li>Tabla de aprendizajes y lista de cambios del incremento.</li>
+    <li>Fotos ordenadas en una carpeta, con nombres como <code>R1_P1_conductor_01.jpg</code> y <code>v0_C1.jpg</code> / <code>v1_C1.jpg</code>.</li>
+    <li>Registro de consentimientos (quién aceptó fotos de manos o de cara).</li>
+    <li>Guion de 2 minutos impreso o en el celular.</li>
+  </ul>
+  <p class="small">Para las fotos: luz natural, fondo liso, misma posición para el antes y el después, y ninguna cara sin permiso.</p>
+  </div>
+</section>
+
+<!-- 11 -->
+<section id="s11">
+  <div class="prose">
+  <h2><span class="n">11</span>Guion de 2 minutos</h2>
+  <p class="small">Los números vienen del simulacro <span class="tag sim">[SIMULADO]</span>: cámbienlos por los suyos.</p>
+  <div class="box script">
+    <p><span class="t">0:00–0:20</span>Nook conecta conductores con los estacionamientos que sobran en edificios de Viña. Antes de diseñar pantallas lindas quisimos saber tres cosas: si el conductor entiende el precio, si sabe qué hacer al llegar y si el conserje puede autorizar rápido sin dejar pasar a cualquiera.</p>
+    <p><span class="t">0:20–0:50</span>Hicimos un prototipo de papel del tamaño de un celular: nueve tarjetas del conductor y cuatro del conserje, con un compañero haciendo de computador. Lo probamos con cinco personas en dos estaciones, conductor y conserje.</p>
+    <p><span class="t">0:50–1:25</span>Aprendimos tres cosas. Primero, en el mapa el precio no decía «por hora» y la mitad creyó que era el total. Segundo, el conserje autorizaba solo con el código: tres de cinco fallaron, uno dejó pasar un auto con otra patente y dos tardaron más de 30 segundos. Tercero, una persona mayor no encontró dónde escribir la dirección.</p>
+    <p><span class="t">1:25–1:50</span>Cambiamos cinco tarjetas: búsqueda arriba con hora y duración, total grande antes de reservar, código y patente grandes al confirmar, y para el conserje una lista donde solo toca la patente y confirma que coincide. En la segunda ronda todos entendieron el precio y los conserjes autorizaron en menos de 30 segundos sin errores.</p>
+    <p><span class="t">1:50–2:00</span>Lo que sigue fallando es escribir la patente y la confianza en el seguro. Eso es lo primero que probaremos en la versión semi digital.</p>
+  </div>
+  </div>
+</section>
+
+<!-- 12 -->
+<section id="s12">
+  <div class="prose">
+  <h2><span class="n">12</span>Siguiente clase: semi digital</h2>
+  <h3>Qué pasar a pantalla primero</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Parte</th><th>Por qué</th></tr></thead>
+    <tbody>
+      <tr><td>Flujo del conductor C1 → C5 v1 (buscar, precio, reservar, código)</td><td>Es donde más se trabaron las personas. En pantalla los tiempos se miden más parejo, sin la demora del computador humano.</td></tr>
+      <tr><td>Conserje K1 v1 → K2 v1</td><td>H3 depende de la velocidad y del tamaño real de los botones; eso solo se prueba bien en un celular de verdad.</td></tr>
+      <tr><td>Se queda en papel: propietario, pago y multas</td><td>Todavía faltan decisiones (tarifas, reparto, multas). No vale la pena pasarlas a pantalla.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Una forma a $0: fotografiar las tarjetas v1 y unirlas con vínculos entre diapositivas en Google Slides o PowerPoint, abiertas en un celular. Confirmen con el profesor qué cuenta como «semi digital».</p>
+  <h3>Hipótesis nuevas</h3>
+  <ul>
+    <li><b>H4 confianza.</b> Creemos que un conductor que desconfía reservará si ve quién responde ante daños. Lo sabremos si al menos 3 de 4 <span class="tag sup">[SUPUESTO]</span> dicen que reservarían de verdad después de leer «Reglas y seguro».</li>
+    <li><b>H5 patente guardada.</b> Creemos que, con la patente guardada en el perfil, una persona mayor reserva en menos de 1 minuto <span class="tag sup">[SUPUESTO]</span>. Lo sabremos midiendo el tiempo de reserva de personas de 60 años o más.</li>
+    <li><b>H6 pago y multa.</b> Creemos que el conductor entiende cuándo paga y qué pasa si se pasa de la hora. Lo sabremos si 4 de 5 <span class="tag sup">[SUPUESTO]</span> lo explican con sus palabras antes de pagar.</li>
+    <li><b>H7 conserje y reparto.</b> Creemos que un conserje acepta usar Nook si ve cuánto gana por auto. Lo sabremos si 3 de 4 conserjes <span class="tag sup">[SUPUESTO]</span> dicen que lo usarían con el reparto mostrado.</li>
+    <li><b>H8 llegada tardía.</b> Creemos que el conserje sabe qué hacer cuando un auto llega fuera de la tolerancia. Lo sabremos si 4 de 5 eligen la acción correcta sin preguntar.</li>
+  </ul>
+  </div>
+</section>
+
+<!-- 13 -->
+<section id="s13">
+  <div class="prose">
+  <h2><span class="n">13</span>Datos a reemplazar</h2>
+  <div class="cols2">
+    <div class="box">
+      <p><span class="tag sim">[SIMULADO]</span> <b>cámbienlo por lo que observen</b></p>
+      <ul>
+        <li>Las 9 personas (P1–P9): nombres, edades y perfiles.</li>
+        <li>Todos los pasos, dudas y errores de cada persona.</li>
+        <li>Todos los tiempos: precio, reserva y conserje.</li>
+        <li>Todas las citas textuales.</li>
+        <li>Resultados ✓/✗ por hipótesis, conteos y porcentajes.</li>
+        <li>Problemas de usabilidad y hallazgos menores de la ronda 1.</li>
+        <li>Tabla de aprendizajes y comparación entre rondas.</li>
+        <li>Cifras del guion de 2 minutos.</li>
+      </ul>
+    </div>
+    <div class="box">
+      <p><span class="tag sup">[SUPUESTO]</span> <b>decídanlo como equipo</b></p>
+      <ul>
+        <li>Umbrales: 80%, 90 s, 2 min, 30 s; ayuda a los 60 s y a los 2 min.</li>
+        <li>Tarifa $1.200/h (y $1.000 y $1.500 de los otros edificios); total $2.400.</li>
+        <li>Tolerancia de 15 min; multa de $600 cada 15 min.</li>
+        <li>Reparto 75% propietario, 15% edificio, 10% conserje; comisión de Nook sin definir.</li>
+        <li>Seguro ante daños: quién lo da y cuánto cubre.</li>
+        <li>Dirección «2 Norte 455», edificios A, B y C, horario 8:00–19:00, altura 2,1 m, N° 14.</li>
+        <li>Código NK-4821, patentes PX·LK·45 y PX·LR·91, nombres en K1 v1.</li>
+        <li>Ganancias de $48.000 en P2.</li>
+        <li>Datos personales: qué ve el conserje (aquí, nombre con inicial y patente) y cuánto tiempo se guarda la patente.</li>
+      </ul>
+    </div>
+  </div>
+  <p class="small">Sobre datos personales: la Ley 21.719 (2024) modifica la Ley 19.628 y, hasta donde sé, entra en vigencia en diciembre de 2026. Verifíquenlo antes de citarla.</p>
+  </div>
+</section>
+
+<!-- 14 -->
+<section id="s14">
+  <div class="prose">
+  <h2><span class="n">14</span>Preguntas para el profesor</h2>
+  <p>La «Matriz MTIP» aparece en la agenda de la clase pero no se explicó, así que aquí no se inventa.</p>
+  <ol>
+    <li>¿Qué es la Matriz MTIP? ¿Qué filas y columnas tiene?</li>
+    <li>¿En qué momento se llena: antes de probar, después, o en cada incremento? ¿Se entrega junto con la validación?</li>
+    <li>¿En qué formato entregamos la validación: informe, presentación, fotos impresas, o mostramos el prototipo físico en clase?</li>
+    <li>¿Cuántas personas mínimo por ronda? ¿Sirven compañeros de otros grupos o tienen que ser conductores y conserjes reales?</li>
+    <li>¿Las hipótesis deben tener un criterio numérico (por ejemplo, 4 de 5) o basta uno cualitativo?</li>
+    <li>¿Cuántos incrementos espera ver: uno (v0 a v1) o más?</li>
+    <li>¿Podemos probar con dos estaciones en paralelo (conductor y conserje)?</li>
+    <li>Para la clase semi digital: ¿qué cuenta como «semi digital»? ¿Fotos de las tarjetas unidas en diapositivas sirven?</li>
+    <li>¿Se puede usar IA para preparar material de apoyo, como el guion o la ficha, si el prototipo y las pruebas son nuestros?</li>
+  </ol>
+  </div>
+</section>
+</div>
+
+<script>
+(function(){
+function hash(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function f(n){return Math.round(n*10)/10}
+
+function drawer(seed){
+  var R=rng(seed),o=[],d={};
+  function J(s){return (R()*2-1)*s}
+  d.R=R;
+  d.ln=function(x1,y1,x2,y2,c){c=c||'s';var ax=x1+J(.5),ay=y1+J(.5),bx=x2+J(.5),by=y2+J(.5),dx=bx-ax,dy=by-ay,L=Math.hypot(dx,dy)||1,k=J(Math.min(1.6,.2+L*.014)),cx=(ax+bx)/2-dy/L*k,cy=(ay+by)/2+dx/L*k;o.push('<path class="'+c+'" d="M'+f(ax)+' '+f(ay)+'Q'+f(cx)+' '+f(cy)+' '+f(bx)+' '+f(by)+'"/>');return d};
+  d.path=function(pts,c){c=c||'s';var p=pts.map(function(q){return [f(q[0]+J(.5)),f(q[1]+J(.5))]});var s='M'+p[0][0]+' '+p[0][1];for(var i=1;i<p.length-1;i++){s+='Q'+p[i][0]+' '+p[i][1]+' '+f((p[i][0]+p[i+1][0])/2)+' '+f((p[i][1]+p[i+1][1])/2)}var l=p[p.length-1];s+='L'+l[0]+' '+l[1];o.push('<path class="'+c+'" d="'+s+'"/>');return d};
+  d.rect=function(x,y,w,h,c,dbl){c=c||'s';function e(){return R()*1.6}d.ln(x-e(),y,x+w+e(),y,c);d.ln(x+w,y-e(),x+w,y+h+e(),c);d.ln(x+w+e(),y+h,x-e(),y+h,c);d.ln(x,y+h+e(),x,y-e(),c);if(dbl)d.rect(x,y,w,h,c,false);return d};
+  d.oval=function(cx,cy,rx,ry,c,wob){c=c||'s';wob=wob||.05;var n=Math.max(12,Math.round((rx+ry)*.9)),a0=R()*6.283,sw=6.283*(1.05+R()*.06),pts=[];for(var i=0;i<=n;i++){var a=a0+sw*i/n,q=1+J(wob);pts.push([cx+Math.cos(a)*rx*q,cy+Math.sin(a)*ry*q])}return d.path(pts,c)};
+  d.circ=function(cx,cy,r,c){return d.oval(cx,cy,r,r,c,.04)};
+  d.blob=function(cx,cy,rx,ry,c){return d.oval(cx,cy,rx,ry,c,.09)};
+  d.dot=function(x,y,r,c){o.push('<circle class="'+(c||'fill')+'" cx="'+f(x)+'" cy="'+f(y)+'" r="'+(r||1.6)+'"/>');return d};
+  d.txt=function(x,y,s,op){op=op||{};var z=op.z||8,a=op.a||'start',c=op.c||'t',r=op.rot!==undefined?op.rot:J(1.1),w=op.w?' font-weight="'+op.w+'"':'';o.push('<text class="'+c+'" x="'+f(x)+'" y="'+f(y)+'" font-size="'+z+'" text-anchor="'+a+'"'+w+' transform="rotate('+f(r)+' '+f(x)+' '+f(y)+')">'+esc(s)+'</text>');return d};
+  d.hatch=function(x,y,w,h,c,sp){c=c||'hb';sp=sp||4.5;for(var k=sp;k<w+h;k+=sp){var x1=k<=w?x+k:x+w,y1=k<=w?y:y+k-w,x2=k<=h?x:x+k-h,y2=k<=h?y+k:y+h;d.ln(x1,y1,x2,y2,c)}return d};
+  d.arrow=function(x1,y1,x2,y2,c){c=c||'s';d.ln(x1,y1,x2,y2,c);var a=Math.atan2(y2-y1,x2-x1),L=5;d.ln(x2,y2,x2-L*Math.cos(a-.5),y2-L*Math.sin(a-.5),c);d.ln(x2,y2,x2-L*Math.cos(a+.5),y2-L*Math.sin(a+.5),c);return d};
+  d.check=function(x,y,s,c){s=s||10;c=c||'s';d.ln(x,y,x+s*.35,y+s*.4,c);d.ln(x+s*.35,y+s*.4,x+s,y-s*.55,c);return d};
+  d.btn=function(x,y,w,h,label,op){op=op||{};var z=op.z||8.5;if(op.p)d.hatch(x+1.5,y+1.5,w-3,h-3,'hb',5);d.rect(x,y,w,h,op.c||'s',!!op.p);if(label)d.txt(x+w/2,y+h/2+z*.36,label,{z:z,a:'middle',w:op.p?700:400});return d};
+  d.field=function(x,y,w,h,ph,op){op=op||{};var z=op.z||7.5;d.rect(x,y,w,h);d.txt(x+5,y+h/2+z*.36,ph,{z:z,c:op.ink?'t':'tg'});return d};
+  d.lupa=function(x,y){d.circ(x,y,3.4);d.ln(x+2.5,y+2.5,x+5.8,y+5.8);return d};
+  d.menu=function(x,y){for(var i=0;i<3;i++)d.ln(x,y+i*4,x+10,y+i*4);return d};
+  d.person=function(x,y){d.circ(x,y-5,2.8);d.path([[x-5.5,y+6],[x-4.5,y+.5],[x,y-1],[x+4.5,y+.5],[x+5.5,y+6]]);return d};
+  d.pin=function(x,y,c){c=c||'s';d.circ(x,y-8,3.6,c);d.ln(x-3.3,y-6.6,x,y,c);d.ln(x+3.3,y-6.6,x,y,c);d.dot(x,y-8,1);return d};
+  d.frame=function(){return d.rect(5,5,130,290)};
+  d.hdr=function(title,op){op=op||{};if(op.back)d.txt(12,23,'←',{z:11,rot:0});else d.menu(13,13);d.txt(70,23,title,{z:op.z||10,a:'middle',w:700});if(op.person!==false)d.person(124,19);return d};
+  d.building=function(x,y,w,h){d.rect(x,y,w,h);var rows=Math.max(2,Math.floor((h-16)/10)),cw=w/4;for(var r=0;r<rows;r++)for(var k=0;k<3;k++)d.rect(x+cw*(k+.6),y+5+r*10,cw*.6,5.5,'sg');d.ln(x+w*.3,y+h,x+w*.3,y+h-9);d.ln(x+w*.7,y+h,x+w*.7,y+h-9);d.ln(x+w*.3,y+h-9,x+w*.7,y+h-9);return d};
+  d.qr=function(x,y,s){d.rect(x,y,s,s);var n=5,c=s/n;for(var i=0;i<n;i++)for(var k=0;k<n;k++)if(R()>.5)o.push('<rect class="fill" x="'+f(x+i*c+.7)+'" y="'+f(y+k*c+.7)+'" width="'+f(c-1.4)+'" height="'+f(c-1.4)+'"/>');return d};
+  d.star=function(x,y,r,c){r=r||6;var p=[];for(var i=0;i<=10;i++){var a=-Math.PI/2+i*Math.PI/5,q=i%2?r*.45:r;p.push([x+Math.cos(a)*q,y+Math.sin(a)*q])}for(var j=0;j<10;j++)d.ln(p[j][0],p[j][1],p[j+1][0],p[j+1][1],c||'s');return d};
+  d.car=function(x,y,w){var h=w*.38;d.path([[x,y+h],[x,y+h*.45],[x+w*.2,y+h*.4],[x+w*.32,y],[x+w*.7,y],[x+w*.82,y+h*.4],[x+w,y+h*.5],[x+w,y+h]]);d.ln(x,y+h,x+w,y+h);d.circ(x+w*.24,y+h,w*.1);d.circ(x+w*.76,y+h,w*.1);return d};
+  d.raw=function(s){o.push(s);return d};
+  d.svg=function(vb,label){return '<svg viewBox="'+vb+'" role="img" aria-label="'+esc(label)+'" xmlns="http://www.w3.org/2000/svg">'+o.join('')+'</svg>'};
+  return d;
+}
+
+function pinB(d,x,y,label,side,rx){side=side||1;rx=rx||16;var cx=x+side*(rx+3),cy=y-17;d.pin(x,y);d.blob(cx,cy,rx,7.5,'sf');d.txt(cx,cy+2.5,label,{z:7,a:'middle'})}
+
+function vina(d,x,y,w,h,mode){
+  d.rect(x,y,w,h);
+  function X(u){return x+u*w} function Y(v){return y+v*h}
+  d.path([[X(.02),Y(0)],[X(.1),Y(.2)],[X(.05),Y(.42)],[X(.12),Y(.62)],[X(.06),Y(.82)],[X(.09),Y(1)]]);
+  d.txt(X(.045),Y(.3),'mar',{z:mode==='obj'?8:5.5,c:'tg',rot:-90,a:'middle'});
+  var names=['5 Norte','3 Norte','1 Norte'],zz=mode==='obj'?7:5;
+  [.14,.28,.42].forEach(function(v,i){d.ln(X(.13),Y(v),X(1),Y(v+.006),'sg');d.txt(X(.98),Y(v)-1.6,names[i],{z:zz,c:'tg',a:'end'})});
+  d.ln(X(.55),Y(0),X(.56),Y(.53),'sg');d.ln(X(.6),Y(0),X(.61),Y(.53),'sg');
+  d.txt(X(.63),Y(.16)+2,'Libertad',{z:zz,c:'tg',rot:90});
+  var ey=.55;
+  d.path([[X(.12),Y(ey)],[X(.4),Y(ey-.02)],[X(.7),Y(ey+.02)],[X(1),Y(ey)]]);
+  d.path([[X(.12),Y(ey+.04)],[X(.4),Y(ey+.02)],[X(.7),Y(ey+.06)],[X(1),Y(ey+.04)]]);
+  d.txt(X(.18),Y(ey)-2,'estero',{z:zz,c:'tg'});
+  d.rect(X(.64),Y(.65),w*.13,h*.08,'sg');
+  d.txt(X(.705),Y(.78),'Plaza Vergara',{z:zz,c:'tg',a:'middle'});
+  d.ln(X(.13),Y(.85),X(1),Y(.856),'sg');d.txt(X(.98),Y(.85)-1.6,'Valparaíso',{z:zz,c:'tg',a:'end'});
+  if(mode==='obj'){
+    [['A',.42,.37],['B',.8,.24],['C',.4,.76]].forEach(function(b){var bx=X(b[1]),by=Y(b[2]);d.hatch(bx-6,by-14,12,12,'hb',3);d.rect(bx-7,by-15,14,14,'s',true);d.txt(bx,by-4.5,b[0],{z:9,a:'middle',w:700})});
+    d.car(X(.22),Y(.93)-9,24);d.txt(X(.22)+28,Y(.93),'autito de papel',{z:8,c:'tg'});
+    d.path([[X(.27),Y(.9)],[X(.33),Y(.75)],[X(.45),Y(.62)],[X(.44),Y(.47)],[X(.42),Y(.4)]],'sb');
+    return;
+  }
+  var p=mode==='h'?'/h':'',rx=mode==='h'?20:16;
+  pinB(d,X(.42),Y(.37),'$1.200'+p,1,rx);
+  pinB(d,X(.8),Y(.24),'$1.000'+p,-1,rx);
+  pinB(d,X(.4),Y(.76),'$1.500'+p,-1,rx);
+  d.dot(X(.3),Y(.93),2.2);d.circ(X(.3),Y(.93),5);d.txt(X(.3)+8,Y(.93)+2.5,'tú',{z:6.5});
+}
+
+var S={};
+S.C1=function(d){d.frame();d.hdr('nook');vina(d,12,34,116,182,'');d.field(12,224,116,22,'¿A dónde vas?');d.lupa(118,234);d.btn(12,254,116,26,'Buscar',{p:1})};
+S.C2=function(d){d.frame();d.hdr('Cerca de Plaza Vergara',{back:1,z:7.5,person:false});d.btn(12,34,56,17,'Llego 9:00',{z:6.5});d.btn(72,34,56,17,'Por 2 h',{z:6.5});
+  [['Edificio A · 2 Norte','4 min a pie','$1.200/h · ★4,6'],['Edificio B · 4 Norte','7 min a pie','$1.000/h · ★4,2'],['Edificio C · Valparaíso','2 min a pie','$1.500/h · ★4,8']].forEach(function(it,i){var y=60+i*58;d.rect(12,y,116,50);d.building(17,y+7,18,36);d.txt(41,y+15,it[0],{z:6.8});d.txt(41,y+28,it[1],{z:6.5,c:'tg'});d.txt(41,y+42,it[2],{z:7.5,w:700})});
+  d.btn(12,240,116,22,'Ver mapa');d.txt(70,280,'toca uno para ver el detalle',{z:6,c:'tg',a:'middle'})};
+S.C3=function(d){d.frame();d.hdr('Edificio A',{back:1});d.building(44,34,52,60);
+  d.txt(12,110,'2 Norte 455 (ejemplo)',{z:7.5});d.txt(12,124,'Hoy: 8:00 a 19:00',{z:7.5});d.txt(12,143,'$1.200 por hora',{z:10,w:700});
+  d.txt(12,159,'Altura máx. 2,1 m',{z:7});d.txt(12,172,'Entrada por portería,',{z:7});d.txt(12,184,'con conserje',{z:7});d.txt(12,204,'★ 4,6 · 23 reservas',{z:7,c:'tg'});
+  d.btn(12,254,116,26,'Reservar',{p:1})};
+S.C4=function(d){d.frame();d.hdr('Reservar',{back:1});d.txt(12,44,'Edificio A · 2 Norte 455',{z:7,c:'tg'});
+  d.txt(12,62,'Hora de llegada',{z:7.5});d.field(12,66,116,20,'09:00   ▾',{ink:1,z:8.5});
+  d.txt(12,104,'¿Cuánto rato?',{z:7.5});d.btn(12,108,24,20,'−',{z:11});d.txt(70,122,'2 horas',{z:9.5,a:'middle'});d.btn(104,108,24,20,'+',{z:11});
+  d.txt(12,146,'Patente',{z:7.5});d.field(12,150,116,20,'__ __ · __ __ · __ __');
+  d.txt(12,188,'Te guardamos el lugar 15 min',{z:6.5,c:'tg'});
+  d.txt(12,238,'Total aprox. $2.400',{z:6,c:'tg'});d.btn(12,246,116,26,'Confirmar reserva',{p:1})};
+S.C5=function(d){d.frame();d.hdr('nook');d.circ(70,62,18);d.check(61,63,18);d.txt(70,100,'¡Reservado!',{z:12,a:'middle',w:700});
+  d.txt(70,118,'Edificio A · 2 Norte 455',{z:7,a:'middle'});d.txt(70,131,'Llega antes de las 9:15',{z:7,a:'middle'});
+  d.txt(18,166,'Código: NK-4821',{z:6.5});d.qr(98,150,22);
+  d.btn(12,214,116,24,'Cómo llegar',{p:1});d.btn(12,246,116,22,'Ver mi reserva',{z:7.5})};
+S.C6=function(d){d.frame();d.hdr('En el edificio',{z:9});d.txt(70,52,'Estás en Edificio A',{z:9,a:'middle'});d.txt(70,66,'Entraste a las 9:02',{z:7,c:'tg',a:'middle'});
+  d.circ(70,114,32);d.ln(70,88,70,92);d.ln(70,136,70,140);d.txt(70,118,'0 h 12 min',{z:9.5,a:'middle',w:700});
+  d.txt(70,168,'Tu reserva: hasta las 11:00',{z:7,a:'middle'});d.txt(70,194,'Recuerda salir a pie',{z:7.5,a:'middle'});d.txt(70,206,'por la portería',{z:7.5,a:'middle'});
+  d.btn(12,246,116,26,'Terminar y pagar',{p:1})};
+S.C7=function(d){d.frame();d.hdr('Pagar',{back:1});d.txt(12,46,'Tu estadía',{z:9,w:700});d.txt(12,62,'9:02 → 11:05',{z:8});d.txt(12,75,'2 h 03 min',{z:7,c:'tg'});
+  d.ln(12,86,128,86,'sg');d.txt(12,102,'2 h × $1.200',{z:7.5});d.txt(128,102,'$2.400',{z:7.5,a:'end'});
+  d.txt(12,116,'3 min extra',{z:7.5});d.txt(128,116,'$0',{z:7.5,a:'end'});d.txt(12,126,'dentro de los 15 min de gracia',{z:5.8,c:'tg'});
+  d.ln(12,134,128,134,'s');d.txt(12,152,'Total',{z:10,w:700});d.txt(128,152,'$2.400',{z:10,a:'end',w:700});
+  d.txt(12,178,'Pagas con: tarjeta guardada',{z:7});d.txt(12,196,'Si te pasas: $600 c/15 min',{z:6.5,c:'tg'});
+  d.btn(12,246,116,26,'Pagar $2.400',{p:1})};
+S.C8=function(d){d.frame();d.hdr('nook');d.circ(70,72,20);d.check(60,73,20);d.txt(70,116,'Pagado',{z:13,a:'middle',w:700});
+  d.txt(70,136,'El conserje ya ve tu pago.',{z:7,a:'middle'});d.txt(70,148,'Puedes sacar el auto.',{z:7,a:'middle'});
+  d.txt(70,184,'¿Cómo te fue?',{z:8,a:'middle'});for(var i=0;i<5;i++)d.star(34+i*18,204,6);
+  d.btn(12,246,116,26,'Volver al inicio')};
+S.E1=function(d){d.frame();d.hdr('Reservar',{back:1});d.circ(70,62,15);d.txt(70,69,'!',{z:18,a:'middle',w:700});
+  d.txt(70,102,'Ups, este lugar se acaba',{z:8.5,a:'middle'});d.txt(70,114,'de ocupar',{z:8.5,a:'middle'});d.txt(70,132,'No te cobramos nada.',{z:7,c:'tg',a:'middle'});
+  d.txt(12,158,'Otros cerca:',{z:8,w:700});d.rect(12,164,116,24);d.txt(18,180,'Edificio C · $1.500/h',{z:7.5});d.rect(12,194,116,24);d.txt(18,210,'Edificio B · $1.000/h',{z:7.5});
+  d.btn(12,246,116,26,'Ver más opciones',{p:1})};
+S.K1=function(d){d.frame();d.hdr('Portería · Edif. A',{z:9,person:false});d.txt(12,48,'Hoy llegan 3 autos',{z:8});
+  d.btn(12,58,116,40,'Ingresar código',{p:1,z:10});d.txt(12,122,'Próximas reservas',{z:7.5,w:700});
+  ['9:00 · Reserva 1','10:30 · Reserva 2','11:00 · Reserva 3'].forEach(function(t,i){var y=140+i*16;d.txt(14,y,t,{z:7});d.ln(12,y+5,128,y+5,'sg')});
+  d.txt(12,214,'Autos dentro: 0',{z:7.5});d.btn(12,246,116,24,'Autos dentro')};
+S.K2=function(d){d.frame();d.hdr('Reserva',{back:1,person:false});d.txt(70,48,'NK-4821',{z:12,a:'middle',w:700});d.check(44,60,7);d.txt(56,62,'Código válido',{z:7});
+  ['Nombre: Camila Rojas','Patente: PX·LK·45','Teléfono: +56 9 •••• ••••','Desde 9:00 hasta 11:00','Estacionamiento N° 14','Pago: al salir','Auto: sedán gris'].forEach(function(t,i){d.txt(14,86+i*13,t,{z:6.3})});
+  d.btn(12,206,116,26,'Autorizar entrada',{p:1});d.btn(12,240,116,22,'Rechazar')};
+S.K3=function(d){d.frame();d.hdr('Portería · Edif. A',{z:9,person:false});d.circ(70,62,16);d.check(62,63,16);
+  d.txt(70,100,'Entrada autorizada',{z:10,a:'middle',w:700});d.txt(12,126,'Indícale:',{z:7.5});d.txt(70,146,'Estacionamiento N° 14',{z:10,a:'middle'});
+  d.txt(70,176,'Asegúrate de que salga',{z:7,a:'middle'});d.txt(70,188,'a pie por la portería.',{z:7,a:'middle'});
+  d.btn(12,236,116,32,'Salió a pie',{p:1,z:9.5})};
+S.K4=function(d){d.frame();d.hdr('Salida',{back:1,person:false});d.txt(70,50,'Sale el auto',{z:9,a:'middle'});d.rect(30,58,80,26,'s',true);d.txt(70,76,'PX·LK·45',{z:11,a:'middle',w:700});
+  d.txt(70,108,'Pago: ✓ pagado $2.400',{z:8,a:'middle'});d.txt(70,122,'Salió a las 11:05',{z:7,c:'tg',a:'middle'});
+  d.txt(70,156,'Si dice «pago pendiente»,',{z:6.8,c:'tg',a:'middle'});d.txt(70,168,'no abras la barrera.',{z:6.8,c:'tg',a:'middle'});
+  d.btn(12,236,116,30,'Confirmar salida',{p:1})};
+S.P1=function(d){d.frame();d.hdr('Mi estacionamiento',{z:9,person:false});d.txt(12,46,'N° 14 · Edificio A',{z:8});d.txt(12,70,'Días disponibles',{z:7.5});
+  'LMMJVSD'.split('').forEach(function(l,i){var x=19+i*17;d.circ(x,86,6.5);if(i<5)d.circ(x,86,7.8,'sb');d.txt(x,89,l,{z:7,a:'middle'})});
+  d.txt(12,114,'Horario',{z:7.5});d.field(12,118,116,20,'8:00   a   19:00',{ink:1,z:8});
+  d.txt(12,154,'Precio por hora',{z:7.5});d.field(12,158,116,20,'$ 1.200',{ink:1,z:8});
+  d.txt(12,194,'Reglas',{z:7.5});d.txt(12,207,'Altura máx. 2,1 m',{z:6.8,c:'tg'});
+  d.btn(12,246,116,26,'Publicar',{p:1})};
+S.P2=function(d){d.frame();d.hdr('Ganancias',{back:1,person:false});d.txt(70,46,'Este mes',{z:7.5,c:'tg',a:'middle'});d.txt(70,70,'$48.000',{z:16,a:'middle',w:700});
+  d.ln(20,140,122,140);[30,44,22,50].forEach(function(h,i){var x=28+i*24;d.hatch(x+1,140-h+1,12,h-2,'hb',3.5);d.rect(x,140-h,14,h);d.txt(x+7,150,'sem '+(i+1),{z:5,c:'tg',a:'middle'})});
+  d.txt(12,174,'Por cada reserva:',{z:7.5,w:700});d.txt(12,188,'Tú 75% · Edificio 15%',{z:7});d.txt(12,200,'Conserje 10%',{z:7});d.txt(12,213,'(ejemplo)',{z:6,c:'tg'});
+  d.btn(12,246,116,24,'Ver detalle')};
+
+S.C1v1=function(d){d.frame();d.hdr('nook');d.field(12,32,116,24,'¿A dónde vas?',{z:9});d.lupa(117,43);
+  d.btn(12,62,56,18,'Llego 9:00 ▾',{z:7});d.btn(72,62,56,18,'Por 2 h ▾',{z:7});
+  vina(d,12,86,116,150,'h');d.btn(12,246,116,26,'Ver lista (3)',{p:1});
+  d.blob(70,56,64,28,'sr');d.txt(70,286,'v1: búsqueda arriba · precio /h',{z:6.5,c:'tr',a:'middle'})};
+S.C3v1=function(d){d.frame();d.hdr('Edificio A',{back:1});d.building(54,32,32,42);
+  d.txt(12,88,'2 Norte 455 (ejemplo)',{z:7});d.txt(12,100,'$1.200/h · hoy 8:00 a 19:00',{z:7});
+  d.rect(14,108,112,42,'s',true);d.txt(70,123,'Total por 2 h',{z:8,a:'middle'});d.txt(70,144,'$2.400',{z:16,a:'middle',w:700});
+  d.blob(70,129,61,28,'sr');
+  d.txt(12,172,'Reglas y seguro',{z:8.5,w:700});d.txt(12,185,'· Cámaras y conserje',{z:7});d.txt(12,197,'· Daños: los cubre el seguro*',{z:7});d.txt(12,209,'· Sales a pie por portería',{z:7});d.txt(12,221,'*ejemplo, por definir',{z:6,c:'tg'});
+  d.btn(12,234,116,26,'Reservar por $2.400',{p:1});d.txt(70,284,'v1: total grande + reglas',{z:6.5,c:'tr',a:'middle'})};
+S.C5v1=function(d){d.frame();d.hdr('nook');d.circ(22,40,7);d.check(17,41,9);d.txt(34,44,'¡Reservado! Edificio A',{z:8,w:700});
+  d.txt(70,66,'Al llegar, muestra esto',{z:8,a:'middle'});d.txt(70,78,'al conserje:',{z:8,a:'middle'});
+  d.rect(16,86,108,70,'s',true);d.txt(70,118,'NK-4821',{z:19,a:'middle',w:700});d.txt(70,142,'Patente PX·LK·45',{z:9,a:'middle'});
+  d.blob(70,121,60,42,'sr');d.txt(70,178,'Llega antes de las 9:15',{z:7.5,a:'middle'});
+  d.btn(12,214,116,24,'Cómo llegar',{p:1});d.btn(12,246,116,22,'Ver mi reserva',{z:7.5});d.txt(70,284,'v1: código grande + patente',{z:6.5,c:'tr',a:'middle'})};
+S.K1v1=function(d){d.frame();d.hdr('Portería · Edif. A',{z:9,person:false});d.txt(12,46,'Llegadas de hoy',{z:10,w:700});d.txt(12,58,'Toca la patente del auto que llega',{z:6,c:'tg'});
+  [['PX·LK·45','9:00 · Camila R.'],['GH·TR·12','10:30 · Diego M.'],['LB·VC·88','11:00 · Sofía P.']].forEach(function(r,i){var y=66+i*42;d.rect(12,y,116,36);d.txt(18,y+17,r[0],{z:11,w:700});d.txt(18,y+29,r[1],{z:6.5,c:'tg'});d.txt(122,y+23,'›',{z:15,a:'end'})});
+  d.blob(70,84,63,24,'sr');d.txt(70,208,'¿No está en la lista?',{z:6.8,c:'tg',a:'middle'});d.btn(30,214,80,18,'Ingresar código',{z:6.5});
+  d.txt(12,256,'Autos dentro: 1',{z:7.5});d.txt(70,284,'v1: lista por patente, sin escribir',{z:6.3,c:'tr',a:'middle'})};
+S.K2v1=function(d){d.frame();d.hdr('Llega un auto',{back:1,person:false});d.txt(70,52,'¿Es la patente del auto?',{z:9,a:'middle',w:700});
+  d.rect(16,62,108,44,'s',true);d.txt(70,92,'PX·LK·45',{z:20,a:'middle',w:700});d.blob(70,84,62,30,'sr');
+  d.txt(70,128,'Camila R. · 9:00 a 11:00',{z:7,a:'middle'});d.txt(70,141,'Estacionamiento N° 14',{z:7,c:'tg',a:'middle'});
+  d.btn(12,156,116,34,'Sí, coincide → autorizar',{p:1,z:8});d.btn(12,198,116,30,'No coincide',{z:9});
+  d.txt(70,262,'sin teléfono: solo lo necesario',{z:6.3,c:'tr',a:'middle'});d.txt(70,284,'v1: mirar la patente es obligatorio',{z:6.3,c:'tr',a:'middle'})};
+
+S.mapa=function(d){d.rect(3,3,294,194,'s');vina(d,12,12,276,176,'obj');return '0 0 300 200'};
+S.ticket=function(d){d.rect(4,4,192,102,'s',true);d.txt(14,22,'NOOK · reserva',{z:9,w:700});d.txt(14,52,'NK-4821',{z:22,w:700});d.qr(150,14,36);
+  d.txt(14,72,'Patente PX·LK·45',{z:10});d.txt(14,88,'Edificio A · 9:00 a 11:00',{z:9});d.txt(14,100,'Estacionamiento N° 14',{z:7,c:'tg'});return '0 0 200 110'};
+S.patentes=function(d){[['PX·LK·45',8,'correcta',''],['PX·LR·91',64,'distinta','(escenario 2)']].forEach(function(p){var y=p[1];d.rect(10,y,128,40,'s',true);d.txt(16,y+9,'CHILE',{z:5,c:'tg'});d.txt(74,y+30,p[0],{z:20,a:'middle',w:700});
+  var cls=y>10?'tr':'tg';d.txt(146,y+18,p[2],{z:9,c:cls});if(p[3])d.txt(146,y+30,p[3],{z:7.5,c:cls})});return '0 0 220 112'};
+S.postits=function(d){function P(x,y,w,h){d.raw('<rect class="pi" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" transform="rotate('+(d.R()*4-2).toFixed(1)+' '+(x+w/2)+' '+(y+h/2)+')"/>')}
+  P(6,8,74,74);d.txt(11,21,'teclado',{z:7,w:700});['1234567890','qwertyuiop','asdfghjklñ','zxcvbnm'].forEach(function(row,r){row.split('').forEach(function(ch,k){var x=10+k*6.7+(r===3?10:0),y=27+r*12;d.rect(x,y,5.6,9,'sg');d.txt(x+2.8,y+6.8,ch,{z:5,a:'middle',rot:0})})});
+  P(88,8,66,74);d.txt(93,22,'☰ Menú',{z:8,w:700});d.txt(94,38,'Mis reservas',{z:7});d.txt(94,51,'Mi auto',{z:7});d.txt(94,64,'Ayuda',{z:7});
+  P(162,8,66,74);d.oval(195,37,10,10,'s',.03);d.txt(195,64,'Cargando…',{z:7.5,a:'middle'});
+  P(236,8,70,74);d.txt(271,30,'Entrada',{z:8.5,a:'middle',w:700,c:'tr'});d.txt(271,42,'rechazada',{z:8.5,a:'middle',w:700,c:'tr'});d.txt(271,58,'avisa al conductor',{z:5.8,a:'middle'});d.txt(271,68,'que revise su reserva',{z:5.8,a:'middle'});
+  return '0 0 312 90'};
+
+document.querySelectorAll('[data-s]').forEach(function(el){var id=el.getAttribute('data-s'),fn=S[id];if(!fn)return;try{var d=drawer(hash(id));var vb=fn(d)||'0 0 140 300';el.innerHTML=d.svg(vb,el.getAttribute('data-label')||id)}catch(e){el.textContent='No se pudo dibujar '+id}});
+
+var FICHA=['FICHA DE OBSERVACIÓN · Nook','Ronda: [ ] 1 [ ] 2   Versión: [ ] v0 [ ] v1   Estación: [ ] conductor [ ] conserje','Fecha: ____  Lugar: ____  Persona: P__  Observador: ____','Fotos: manos [ ] sí [ ] no · cara [ ] sí [ ] no','','PERFIL','Edad aprox.: __  Maneja: [ ] a diario [ ] semanal [ ] poco  ¿Conoce Viña? [ ] sí [ ] no  ¿Usa apps de mapas? [ ] sí [ ] no','','TAREA','Inicio: __:__  Fin: __:__  Duración: ____','Tarjeta | Qué hizo | Dudas o errores | ¿Ayuda?','  |  |  |','  |  |  |','  |  |  |','  |  |  |','  |  |  |','«¿Cuánto vas a pagar?»: ________  ¿Correcto? [ ] sí [ ] no','«¿Qué haces al llegar?»: ________  ¿Menciona código o patente? [ ] sí [ ] no','Conserje · esc. 1: ___ s [ ] autorizó   esc. 2: [ ] rechazó [ ] dejó pasar   Interrupción: [ ] sí [ ] no','','HIPÓTESIS','H1 [ ] ✓ [ ] ✗ [ ] con ayuda   H2 [ ] ✓ [ ] ✗ [ ] con ayuda   H3 [ ] ✓ [ ] ✗ [ ] con ayuda','','CITAS TEXTUALES','1.','2.','','RESPUESTAS DE CIERRE (1 a 6)','1.','2.','3.','4.','5.','6.','','IDEA DE CAMBIO (máx. 2) Y N° DE FOTOS','1.','2.','Fotos N°:'].join('\n');
+var btn=document.getElementById('copyFicha'),msg=document.getElementById('copyMsg');
+btn.addEventListener('click',function(){
+  function fallback(){var ta=document.createElement('textarea');ta.value=FICHA;ta.setAttribute('aria-label','Ficha como texto');ta.style.width='100%';ta.style.height='12em';ta.style.marginTop='8px';btn.parentNode.insertAdjacentElement('afterend',ta);ta.focus();ta.select();msg.textContent='Selecciona y copia el texto de abajo.'}
+  try{navigator.clipboard.writeText(FICHA).then(function(){msg.textContent='Ficha copiada.'},fallback)}catch(e){fallback()}
+});
+})();
+</script>
+</body>
+</html>
